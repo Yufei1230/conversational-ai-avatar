@@ -1,0 +1,13 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "ACE Conversation MetaHuman",
+  "CanContainContent": false,
+  "EnabledByDefault": true,
+  "Plugins": [
+    { "Name": "ACEConversation", "Enabled": true },
+    { "Name": "NV_ACE_Reference", "Enabled": true }
+  ],
+  "Modules": [{ "Name": "ACEConversationMetaHuman", "Type": "Runtime", "LoadingPhase": "Default", "PlatformAllowList": ["Win64"] }]
+}
