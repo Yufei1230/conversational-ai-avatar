@@ -1,146 +1,159 @@
-# MetaHuman + NVIDIA ACE
+# NVIDIA ACE + MetaHuman Conversational AI Avatar
 
-An Unreal Engine digital human project built around **MetaHuman + NVIDIA ACE**.
-The primary workflow connects microphone input to a conversational backend and
-returns synthesized speech to Unreal for playback and ACE Audio2Face facial
-animation integration.
+A speech-driven digital human demonstration built with **Unreal Engine 5.6.1**, MetaHuman, NVIDIA ACE Audio2Face, and a Python conversation backend. A prerecorded spoken question is transcribed, answered by an LLM, synthesized into speech, and presented by a MetaHuman through the local `LocalA2F-Mark` provider.
 
-The current focus is the **Unreal / MetaHuman experience**, with a Windows
-hosted NVIDIA speech and language backend and an optional Mac microphone client.
-The repository focuses on the English conversation workflow.
+The project explores how speech, language, and character-animation systems can work together in a repeatable demonstration. Its main engineering contributions are a WebSocket conversation bridge, response fan-out to Unreal, a buffered MetaHuman audio adapter, and a separate studio presentation that preserves the working conversation setup.
+
+![MetaHuman in the reviewed studio presentation, captured at 1920 by 1080](docs/media/metahuman-presentation-1080.png)
+
+*Actual game-viewport capture from the local `/Game/MetaHumanPresentation_Reviewed` level. Character assets, presentation maps, NVIDIA model files, and Unreal Engine are not distributed in this source repository.*
+
+**Start here:** [Demo guide](docs/DEMO_GUIDE.md) ? [Audio and conversation flow](docs/AUDIO_AND_CONVERSATION.md) ? [Validation and limitations](docs/VALIDATION.md) ? [Unreal integration](unreal/README.md)
+
+## Implemented features
+
+- Prerecorded WAV input through a Python CLI; real ASR ? LLM ? TTS responses have been exercised in the local Unreal demo.
+- A FastAPI WebSocket backend with VAD/explicit end-of-input handling, streamed LLM text, sentence-based TTS requests, and binary PCM audio frames.
+- Publish/observe routing: a question client publishes to `metahuman-demo`; the Unreal observer receives the resulting response without capturing a microphone itself.
+- An `ACEConversationMetaHuman` adapter that buffers a complete response, creates a temporary WAV, and submits it to the existing NVIDIA ACE character setup.
+- Synchronized speech and facial curves through the existing `ACEAudioCurveSource` and MetaHuman face animation graph.
+- Repeated, operator-paced questions while the Unreal observer stays connected. **Each shipped CLI invocation creates a new session; the LLM has no conversation memory.**
+- A separate upper-body studio presentation with a blue-gray background, intended camera, and locally validated 1920?1080 capture profile.
+- Protocol/session tests, synthetic observer-routing and PCM conversion tests, and an Unreal buffered-WAV automation test.
+
+An additional [live microphone client](services/orchestrator/tools/LIVE_MIC_CLIENT.md) exists. Its conversion and routing paths have synthetic coverage; those tests do not validate a physical Mac microphone session. Prerecorded WAV input is the documented demonstration path.
 
 ## Architecture
 
-```text
-Microphone (Unreal or Mac client)
-    -> WebSocket conversation orchestrator (FastAPI + asyncio)
-    -> NVIDIA ASR -> NVIDIA LLM -> NVIDIA TTS
-    -> PCM audio returned to Unreal
-         -> Audio playback
-         -> NVIDIA ACE / Audio2Face -> MetaHuman facial animation
+```mermaid
+flowchart LR
+    Q[Prerecorded question WAV] --> C[Python demo_client.py]
+    C -->|WebSocket publish: metahuman-demo| WS
+
+    subgraph Backend[Python orchestrator - FastAPI]
+        WS[WebSocket session and response mirror]
+        TURN[VAD and turn controller]
+        WS --> TURN
+        TURN --> ASR[ASR - buffered utterance]
+        ASR -->|Transcript| LLM[LLM - system prompt and current question]
+        LLM -->|Text deltas to sentence queue| TTS[TTS - synthesize each sentence]
+        TTS -->|PCM chunks and tts.end| WS
+    end
+
+    subgraph Unreal[Unreal Engine 5.6.1 client]
+        BRIDGE[ACEConversation plugin - WebSocket observer]
+        BUFFER[ACEConversationMetaHuman - complete-response WAV buffer]
+        A2F[NVIDIA ACE Audio2Face - LocalA2F-Mark]
+        SOURCE[Existing ACEAudioCurveSource]
+        FACE[MetaHuman face animation Blueprint]
+        AUDIO[Synchronized speech playback]
+        START[Character BeginPlay]
+        INTRO[Imported introduction SoundWave]
+        BRIDGE --> BUFFER
+        BUFFER -->|WAV after tts.end| A2F
+        START --> INTRO --> A2F
+        A2F --> SOURCE
+        SOURCE --> FACE
+        SOURCE --> AUDIO
+    end
+
+    WS -->|WebSocket observe: metahuman-demo| BRIDGE
+    WS -->|Events and response PCM| C
 ```
 
-The repository contains the conversation backend, WebSocket/audio bridge,
-playback components, and an Unreal project skeleton. MetaHuman assets and the
-NVIDIA ACE Unreal Plugin must be installed in the Unreal environment separately.
-The skeleton documents the Audio2Face hook points; its commented ACE calls need
-to be wired up when integrating the plugin. Backend or standalone playback tests
-alone do not verify MetaHuman facial animation.
+ASR, LLM, and TTS use configured service adapters; the validated English setup uses NVIDIA-hosted services. `LocalA2F-Mark` runs on the Unreal host. A local facial-animation provider does **not** make the entire conversation pipeline offline.
 
-## Start here
+### Two distinct audio paths
 
-1. Set up the [Windows hosted backend](services/orchestrator/README.md#windows-hosted-backend-english-default).
-2. Follow [Unreal integration](unreal/README.md) to add MetaHuman, the ACE plugin,
-   conversation components, and the Audio2Face animation path.
-3. Test [Unreal WebSocket audio playback](unreal/WEBSOCKET_AUDIO_TEST.md) and
-   [microphone conversation](unreal/MICROPHONE_TEST.md).
-4. To use a Mac microphone with the Windows/Unreal host, follow the
-   [live microphone guide](services/orchestrator/tools/LIVE_MIC_CLIENT.md).
+**Startup introduction:** pressing Play runs the existing character BeginPlay logic. It submits the imported `/Game/TestAudio/english-e2e` SoundWave to ACE. That clip originated from an earlier LLM/TTS response, but startup playback makes no new ASR, LLM, or TTS request.
 
-### Windows conversation backend
+**Dynamic question:** `demo_client.py --wav ...` sends 16 kHz mono PCM16 input over WebSocket. The backend buffers the utterance for ASR, streams LLM text into a sentence queue, and synthesizes each sentence. Unreal receives PCM chunks but waits for the **entire TTS response** before submitting a WAV to Audio2Face. The existing ACE component then drives speech and facial animation together.
 
-Use Python 3.11. From the repository root, run in PowerShell:
+This is buffered playback with chunked network transport, not incremental token-to-mouth animation. Backend `turn_complete` means generation and transmission finished; Unreal's separate playback-completion message determines when to submit the next question. See [the detailed flow](docs/AUDIO_AND_CONVERSATION.md).
+
+## Technology and inspected environment
+
+| Component | Role / inspected version |
+|---|---|
+| Unreal Engine **5.6.1** | Windows renderer and application host; installed build CL 44394996 |
+| MetaHuman | Existing character, face rig, hair, and face animation Blueprint |
+| NVIDIA ACE plugin | Installed `NV_ACE_Reference` version `2.5.0-20250614-2282` |
+| `LocalA2F-Mark` | Installed local Audio2Face provider |
+| Python / FastAPI / Uvicorn | Conversation state and WebSocket endpoint; Python 3.11 environment used locally |
+| ASR / LLM / TTS | NVIDIA Riva gRPC recognition, an OpenAI-compatible chat API, and hosted speech synthesis in the demonstrated configuration |
+| WebSocket / ACE1 | JSON control messages and framed little-endian PCM16 audio |
+
+The Python package declares Python ?3.10. The MetaHuman receiver currently declares **Win64** support. Models, endpoints, credentials, and voice selection are configured through an ignored `.env`; templates record a configuration, not a guarantee of current service availability.
+
+## Setup and execution
+
+For the already configured Windows machine, follow the [demo guide](docs/DEMO_GUIDE.md). It preserves the existing environment, audio files, maps, and animation Blueprints.
+
+For a new checkout, these are **setup instructions, not a newly validated clean-machine installation**:
 
 ```powershell
-py -3.11 -m venv services/orchestrator/.venv
-.\services\orchestrator\.venv\Scripts\python.exe -m pip install -e .\services\orchestrator
-# Fresh checkout only: do not overwrite an existing .env.
-Copy-Item services/orchestrator/.env.example services/orchestrator/.env
-.\services\orchestrator\.venv\Scripts\python.exe services/orchestrator/tools/init_storage.py
+# From the repository root; requires an installed Python 3.11 interpreter.
+Set-Location services/orchestrator
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e .
+if (-not (Test-Path -LiteralPath .env)) {
+    Copy-Item -LiteralPath .env.example -Destination .env
+}
 ```
 
-Set `ACE_NIM_API_KEY` in the ignored `services/orchestrator/.env`. The example
-configuration uses hosted NVIDIA ASR, an OpenAI-compatible NVIDIA LLM endpoint,
-and hosted Magpie TTS, with English defaults. This backend configuration does
-not require local model downloads or Docker services. See the
-[backend README](services/orchestrator/README.md) for language, voice, endpoint,
-and storage settings.
+Configure service access and credentials in `.env` using the [backend guide](services/orchestrator/README.md). Keep all three mock flags false for a real demonstration. Do not replace a working environment with the template.
 
 ```powershell
-.\services\orchestrator\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8080
+# From services/orchestrator, after configuring the environment.
+.\.venv\Scripts\python.exe tools/init_storage.py
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8080 --workers 1
 ```
 
-Connect the Unreal bridge to `ws://127.0.0.1:8080/ws/session` when running on the
-same host. For remote microphone access, follow the networking instructions in
-the live microphone guide. The WebSocket endpoint has no authentication; use a
-private network/tunnel or restrict access to the intended client.
+Use **one worker**: response routing is stored in process memory. A new machine also needs Unreal Engine, an assembled MetaHuman with a working ACE facial graph, and compatible NVIDIA ACE/Mark plugins and model assets. Follow [Unreal integration](unreal/README.md); cloning this repository alone does not supply the local `MetaHumanTest` project or maps.
 
-### MetaHuman and ACE integration
+Once Unreal reports its observer ready, submit a prepared WAV in a second terminal:
 
-The included Unreal skeleton targets UE 5.6:
-`unreal/ACEAvatarSandbox/ACEAvatarSandbox.uproject`.
+```powershell
+# From services/orchestrator. Replace the input path with your recording.
+$question = Join-Path $env:USERPROFILE 'Documents\VoiceQuestions\question1.wav'
+$answer = Join-Path 'outputs' ('answer-' + [guid]::NewGuid().ToString('N') + '.wav')
+.\.venv\Scripts\python.exe tools/demo_client.py `
+    --url 'ws://127.0.0.1:8080/ws/session?publish=metahuman-demo' `
+    --wav $question --require-real --output $answer
+```
 
-- Add your MetaHuman and install the NVIDIA ACE Unreal Plugin.
-- Configure `Face_AnimBP` with `Apply ACE Face Animations` and the
-  `mh_arkit_mapping_pose_A2F` pose asset, following the integration guide.
-- Configure the Audio2Face provider, including `RemoteA2F` for the documented
-  remote Audio2Face-3D path.
-- Use `ConversationBridgeComponent` for session events and PCM audio transfer.
-- Connect `OnTtsStarted`, `OnTtsAudioChunk`, and `OnTtsEnded` to
-  `ACEAudioPlaybackComponent` for playback, and route the same PCM audio into
-  the ACE Audio2Face integration for facial animation.
+This custom-path example uses the existing CLI interface; it was not executed with a new personal recording during the documentation review. The guide includes the previously exercised demo-file command, readiness logs, and required manual wait between questions.
 
-See [Unreal integration](unreal/README.md) for the plugin module, runtime calls,
-animation setup, and project-specific wiring.
-
-### Mac microphone input
-
-The Mac client sends microphone audio to the backend and can mirror responses
-to an Unreal observer, without relying on RDP microphone redirection. Connect
-the Unreal observer first. The documented CLI runs one response per invocation;
-reconnect the observer actor before the next invocation. Response mirroring
-requires a single backend worker.
-
-Follow the [live microphone guide](services/orchestrator/tools/LIVE_MIC_CLIENT.md)
-for dependencies, commands, audio format, and validation limits.
-
-## Repository layout
+## Repository map
 
 | Path | Purpose |
-| --- | --- |
-| `services/orchestrator/` | FastAPI conversation backend, provider adapters, microphone clients, and tests |
-| `unreal/ACEAvatarSandbox/` | Unreal Engine project skeleton |
-| `unreal/Plugins/ACEConversation/` | Conversation bridge, audio playback, and test components |
-| `unreal/README.md` | MetaHuman and NVIDIA ACE integration instructions |
-| `docs/architecture/ace-sandbox.md` | Original sandbox architecture and protocol notes |
-| `infra/llm/` | Hosted LLM endpoint checks |
-| `infra/compose/` | Optional Linux speech NIM deployment templates |
+|---|---|
+| [`services/orchestrator`](services/orchestrator/README.md) | Backend, CLI clients, configuration template, Python tests |
+| [`unreal/Plugins/ACEConversation`](unreal/Plugins/ACEConversation) | WebSocket bridge and generic microphone/audio diagnostics |
+| [`unreal/Plugins/ACEConversationMetaHuman`](unreal/Plugins/ACEConversationMetaHuman) | Buffered adapter reusing the existing NVIDIA ACE character |
+| [`unreal/tools`](unreal/tools) | Local preservation, setup, validation, and audio-diagnostic helpers |
+| [`docs`](docs/README.md) | Demo workflow, implementation explanation, validation, and related research |
+| `unreal/ACEAvatarSandbox` | Generic integration scaffold; not the finished MetaHuman project |
+| `infra/`, `tts/`, `Irodori-TTS` | Separate Tokkio/Linux, RAG, and Japanese TTS experiments; not required by the Windows demo |
 
-## Verification
+## Validation
 
-Run backend and microphone-client tests from the repository root after installing
-the backend and client dependencies:
+On **2026-10-10**, all **30 Python unittest tests passed**, and `pip check` reported no broken requirements in the existing environment. A saved Unreal report records `ACE.MetaHuman.BufferedWav` passing on 2026-09-28. Earlier real-provider runs reached MetaHuman playback completion; the presentation review separately checked the camera, startup audio/animation, and a native 1080p viewport.
 
-```powershell
-.\services\orchestrator\.venv\Scripts\python.exe -m pip install -r services/orchestrator/tools/live_mic_requirements.txt
-Push-Location services/orchestrator
-.\.venv\Scripts\python.exe -m unittest discover -s tests
-Pop-Location
-.\services\orchestrator\.venv\Scripts\python.exe -m pip check
-```
+These are different kinds of evidence. Unit tests do not establish perceptual lip-sync quality, and a startup-clip rendering check does not establish a new ASR ? LLM ? TTS turn. See [validation scope and evidence](docs/VALIDATION.md) before interpreting results as benchmarks.
 
-With the backend running and provider credentials configured, test a real audio
-turn:
+## Current limitations and next steps
 
-```powershell
-.\services\orchestrator\.venv\Scripts\python.exe services/orchestrator/tools/demo_client.py --generate-input --require-real --output services/orchestrator/outputs/english-e2e.wav
-```
+- **No conversation memory:** each LLM request contains only the system prompt and current transcript. A channel name is a routing label.
+- **Manual turn pacing:** one WAV per CLI invocation; no native playlist, backend playback acknowledgement, or automatic question queue. Overlapping Unreal responses are rejected.
+- **Buffered latency:** ASR waits for the utterance; Unreal waits for the complete response. No end-to-end latency benchmark is claimed.
+- **Half-duplex demonstration:** no validated barge-in workflow. The WAV client does not play the user's question aloud.
+- **Limited idle behavior:** independent blinking, gaze shifts, and head/body idle were not active in the inspected presentation; the face can retain its final ACE pose.
+- **Local-demo deployment:** no WebSocket authentication or application TLS, no cross-worker routing, no automatic Unreal reconnect, and no packaged-release validation.
+- **External prerequisites:** provider access, compatible GPU/runtime, proprietary character/engine assets, and local maps are required. Existing diagnostic warnings remain in logs even when capture overlays are hidden.
 
-`GET /healthz` checks process liveness. `GET /status` reports provider status;
-ASR connectivity requires the audio test. Verify Unreal playback and MetaHuman
-facial animation separately in the engine. Historical validation reports record
-the environments used for those runs, not a guarantee for a new installation.
+Planned improvements are explicit conversation history, a playback-finished acknowledgement and turn queue, safely blended idle/gaze animation, lower-latency audio delivery, and broader deployment/capture testing. These are development directions, not implemented features.
 
-## Optional Linux services
+## Project scope and attribution
 
-- [Linux speech NIM](infra/compose/README.md): local ASR/TTS service templates.
-- [LLM endpoint checks](infra/llm/README.md): hosted endpoint validation.
-
-## Configuration and storage
-
-Keep API keys in ignored `.env` files, and keep models, caches, generated audio,
-and Unreal build artifacts outside Git. The hosted backend uses service-relative
-runtime directories by default. Legacy Linux guides use `/data/ACE` and
-`/home2/ko66/ace-sandbox`; adapt those paths only when using those deployments.
-Historical Windows reports also contain machine-specific paths that must be
-adjusted for your environment.
+This is an independent integration and demonstration project, not an official NVIDIA or Epic Games sample. NVIDIA ACE/Audio2Face and Epic Games Unreal Engine/MetaHuman are external dependencies. Their SDKs, models, character assets, and applicable terms remain separate from this repository. No third-party binaries or new license grant are included in this documentation update.
