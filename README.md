@@ -8,11 +8,11 @@ The project explores how speech, language, and character-animation systems can w
 
 *Actual game-viewport capture from the local `/Game/MetaHumanPresentation_Reviewed` level. Character assets, presentation maps, NVIDIA model files, and Unreal Engine are not distributed in this source repository.*
 
-**Start here:** [Demo guide](docs/DEMO_GUIDE.md) ? [Audio and conversation flow](docs/AUDIO_AND_CONVERSATION.md) ? [Validation and limitations](docs/VALIDATION.md) ? [Unreal integration](unreal/README.md)
+**Start here:** [Demo guide](docs/DEMO_GUIDE.md) -> [Audio and conversation flow](docs/AUDIO_AND_CONVERSATION.md) -> [Validation and limitations](docs/VALIDATION.md) -> [Unreal integration](unreal/README.md)
 
 ## Implemented features
 
-- Prerecorded WAV input through a Python CLI; real ASR ? LLM ? TTS responses have been exercised in the local Unreal demo.
+- Prerecorded WAV input through a Python CLI; real ASR -> LLM -> TTS responses have been exercised in the local Unreal demo.
 - A FastAPI WebSocket backend with VAD/explicit end-of-input handling, streamed LLM text, sentence-based TTS requests, and binary PCM audio frames.
 - Publish/observe routing: a question client publishes to `metahuman-demo`; the Unreal observer receives the resulting response without capturing a microphone itself.
 - An `ACEConversationMetaHuman` adapter that buffers a complete response, creates a temporary WAV, and submits it to the existing NVIDIA ACE character setup.
