@@ -18,19 +18,12 @@ The current demo uses **prerecorded WAV input and buffered response playback**. 
 ## System overview
 
 ```mermaid
-flowchart TB
-    INPUT["Recorded question"] --> ASR
-    subgraph BACKEND["Conversational AI Backend"]
-        ASR["Speech recognition"] --> LLM["Language model"] --> TTS["Speech synthesis"]
-    end
-    TTS --> BRIDGE["Audio Bridge: WebSocket and PCM-to-WAV buffering"]
-    subgraph ENGINE["Unreal Engine and NVIDIA ACE"]
-        A2F["Audio2Face-3D: LocalA2F-Mark"]
-        A2F --> FACE["MetaHuman facial animation"]
-        A2F --> VOICE["Synchronized speech playback"]
-    end
-    BRIDGE --> A2F
-    INTRO["Prepared introduction"] --> A2F
+flowchart LR
+    INPUT["Question WAV"] --> BACKEND["Backend: ASR / LLM / TTS"]
+    BACKEND --> BRIDGE["Audio Bridge"]
+    BRIDGE --> ACE["Audio2Face-3D"]
+    INTRO["Prepared intro"] --> ACE
+    ACE --> AVATAR["MetaHuman"]
 ```
 
 The question client publishes to `metahuman-demo`, and Unreal observes that channel. The bridge buffers the complete generated response before passing a WAV to Audio2Face-3D. The startup introduction uses an existing audio clip; answers to submitted questions are generated dynamically.
@@ -83,5 +76,7 @@ See [validation and known limits](docs/VALIDATION.md) for the scope of the recor
 2. **Natural avatar animation:** improve facial expressions, eye movement, and idle motion.
 
 ## Acknowledgements
+
+Special thanks to [kosuketut/ace_kagawa](https://github.com/kosuketut/ace_kagawa) for its ACE conversation sandbox and reference implementation, including the Python orchestrator and Unreal integration components.
 
 This independent project integrates NVIDIA ACE/Audio2Face-3D and Epic Games Unreal Engine/MetaHuman. Their software, models, and character assets remain subject to their respective terms and are not bundled here.
