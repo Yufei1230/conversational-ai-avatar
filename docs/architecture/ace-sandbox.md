@@ -1,10 +1,11 @@
 # MetaHuman + ACE Conversation Architecture
 
-The primary workflow uses Unreal Engine 5.6 for MetaHuman rendering, microphone
-capture, response playback, and NVIDIA ACE Audio2Face integration. A FastAPI
-backend coordinates hosted NVIDIA ASR, LLM, and TTS providers. A Mac microphone
-client can publish audio to the backend and mirror responses to an Unreal
-observer; see the [live microphone guide](../../services/orchestrator/tools/LIVE_MIC_CLIENT.md).
+The demonstrated workflow sends prerecorded WAV questions to a FastAPI backend
+for ASR, LLM, and TTS. A WebSocket observer delivers the response to Unreal Engine
+5.6.1, where NVIDIA ACE Audio2Face-3D drives the MetaHuman. The optional
+[microphone client](../../services/orchestrator/tools/LIVE_MIC_CLIENT.md) is an
+experimental input path; full live microphone-to-avatar interaction is not yet
+validated. See the [audio flow](../AUDIO_AND_CONVERSATION.md) for the current demo.
 
 ## Runtime and state
 
@@ -14,9 +15,12 @@ sentence-based synthesis, response audio, and per-turn logs. Hosted ASR buffers
 an utterance before offline recognition; LLM responses stream and completed
 sentences are synthesized into PCM chunks.
 
-The Unreal bridge passes response PCM to the playback component and provides
-hook points for ACE Audio2Face. Installing the ACE plugin and wiring those hooks
-and the MetaHuman animation blueprint are separate engine-side steps.
+The `ACEConversation` bridge forwards response PCM to `MetaHumanTtsReceiver`.
+The receiver buffers the full response, writes a WAV, and submits it to the
+existing ACE-enabled character using `LocalA2F-Mark`. The NVIDIA component
+handles synchronized audio and facial animation. The generic procedural playback
+component is a separate diagnostic route. NVIDIA packages and the MetaHuman
+assets must be installed in the target Unreal project.
 
 ## Audio contracts
 

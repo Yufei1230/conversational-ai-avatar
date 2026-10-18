@@ -1,12 +1,12 @@
-# Python conversation orchestrator
+# Python conversation backend
 
-FastAPI backend for the NVIDIA ACE + MetaHuman demo. It accepts framed microphone/WAV audio, runs ASR ? LLM ? TTS, and returns text events and PCM audio. An optional publish/observe channel mirrors the response to Unreal.
+FastAPI backend for the NVIDIA ACE + MetaHuman demo. It receives speech audio, runs ASR, LLM, and TTS, and returns text events and PCM audio. Publish/observe routing forwards the same response to Unreal.
 
-For the configured MetaHuman scene, start with the [demo guide](../../docs/DEMO_GUIDE.md). For implementation details, see [audio and conversation flow](../../docs/AUDIO_AND_CONVERSATION.md).
+For the full operating sequence, see the [demo guide](../../docs/DEMO_GUIDE.md).
 
 ## Setup
 
-The existing Windows environment uses Python 3.11; the package declares Python ?3.10. From this directory, a **fresh-environment recipe** is:
+Python **3.10 or newer** is required; the local Windows demo uses Python 3.11. From this directory:
 
 ```powershell
 py -3.11 -m venv .venv
@@ -16,89 +16,81 @@ if (-not (Test-Path -LiteralPath .env)) {
 }
 ```
 
-This installation recipe was not rerun on a clean machine during the documentation review. Keep the working environment and credentials on the configured demo machine.
+Edit `.env` with your provider credentials and configuration. Settings load it relative to this service directory. Keep an existing working `.env` when updating the repository. A complete clean-machine reproduction is not yet validated.
 
-Edit the local `.env` with your own provider access. [The template](.env.example) contains no keys. Settings load this file relative to the service directory, not an arbitrary shell working directory.
-
-| Settings | Purpose |
+| Setting | Purpose |
 |---|---|
-| `ACE_NIM_API_KEY` | Credential used by the hosted LLM/TTS adapters |
-| `ACE_ASR_API_KEY` | Optional separate ASR credential; falls back to `ACE_NIM_API_KEY` when empty |
-| `ACE_ASR_SERVER`, `ACE_ASR_FUNCTION_ID`, `ACE_ASR_MODEL` | Recognition service/model selection |
-| `ACE_ASR_USE_HOSTED_API`, `ACE_ASR_USE_SSL` | Hosted gRPC authorization and transport selection |
-| `ACE_NIM_LLM_BASE_URL`, `ACE_NIM_LLM_MODEL` | OpenAI-compatible chat-completions endpoint and configured model |
-| `ACE_TTS_USE_HOSTED_API`, `ACE_TTS_API_URL`, `ACE_TTS_VOICE` | Speech synthesis route and voice |
-| `ASSISTANT_LANGUAGE`, `ASR_LANGUAGE`, `TTS_LANGUAGE` | Server-side language configuration; English is the default |
-| `ACE_SYSTEM_PROMPT` | Optional prompt override; blank selects the configured language's default |
-| `ACE_MOCK_ASR`, `ACE_MOCK_LLM`, `ACE_MOCK_TTS` | Keep false for real-provider demonstrations |
-| `ACE_LOG_DIR`, `ACE_AUDIO_DIR`, `ACE_SAVE_DEBUG_AUDIO` | Transcript/timing logs and optional input/output audio storage |
-| `ACE_VALIDATE_EXTERNALS_ON_STARTUP` | Optional startup service checks; false in the template |
-| `ACE_SKIP_LLM_MODEL_VALIDATION` | Optional skip of model discovery; not proof a model works |
+| `ACE_NIM_API_KEY` | Hosted LLM/TTS credential; also used for ASR when its separate key is empty |
+| `ACE_ASR_API_KEY` | Optional separate ASR credential |
+| `ACE_ASR_SERVER`, `ACE_ASR_FUNCTION_ID`, `ACE_ASR_MODEL` | Recognition endpoint and model |
+| `ACE_ASR_USE_HOSTED_API`, `ACE_ASR_USE_SSL` | Hosted gRPC authorization and transport |
+| `ACE_NIM_LLM_BASE_URL`, `ACE_NIM_LLM_MODEL` | Chat-completions endpoint and model |
+| `ACE_TTS_USE_HOSTED_API`, `ACE_TTS_API_URL`, `ACE_TTS_VOICE` | Speech synthesis endpoint and voice |
+| `ASSISTANT_LANGUAGE`, `ASR_LANGUAGE`, `TTS_LANGUAGE` | Language configuration; English is the default |
+| `ACE_SYSTEM_PROMPT` | Optional assistant prompt override |
+| `ACE_MOCK_ASR`, `ACE_MOCK_LLM`, `ACE_MOCK_TTS` | Keep all false for a real demonstration |
+| `ACE_SAVE_DEBUG_AUDIO`, `ACE_LOG_DIR`, `ACE_AUDIO_DIR` | Optional recordings and runtime logs |
 
-Endpoint/model names in the template reflect the implementation's configuration. Provider availability and account access must be checked with a real turn. A separate Japanese/Tokkio configuration elsewhere in this repository is not automatically part of the Windows demo.
+## Model configuration and source status
+
+The October 17 local demo switched to NVIDIA-hosted **GPT-OSS 20B**. Its `.env` selects:
+
+```dotenv
+ACE_NIM_LLM_BASE_URL=https://integrate.api.nvidia.com/v1
+ACE_NIM_LLM_MODEL=openai/gpt-oss-20b
+```
+
+That local deployment also has model-specific adapter changes and extra tests which have **not been published here**. This checkout's `.env.example` and `app/settings.py` still default to `nvidia/nemotron-3.5-lightning-30b-a3b`; `app/adapters/llm.py` retains the earlier request format. Setting the model identifier alone is not a verified reproduction of the local GPT-OSS recovery.
+
+For a model change, update the local `.env`, verify the adapter's request parameters and streaming response handling for that model, then restart Uvicorn. Confirm an actual answer and TTS output. Model discovery through `/models` does not prove inference works. The [October 17 incident record](../../docs/troubleshooting/2026-10-17-hosted-llm-timeout-and-recovery.md) documents the tested local recovery.
+
+## Run
 
 ```powershell
 .\.venv\Scripts\python.exe tools/init_storage.py
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8080 --workers 1
 ```
 
-This launch pattern has been used on the configured machine. Keep **one worker** for publish/observe routing. Uvicorn's explicit `--host`/`--port` arguments control this command; do not assume `ACE_HOST` overrides them.
+Use **one worker** because response routing is held in process memory. Explicit Uvicorn arguments control the bind address and port. The application has no authentication or TLS; use loopback or a protected private connection.
 
-## Interfaces
-
-| Interface | Meaning |
+| Interface | Purpose |
 |---|---|
-| `GET /healthz` | Process liveness only |
-| `GET /status` | Adapter/configuration checks; hosted ASR connectivity still requires an audio turn |
-| `WS /ws/session` | One bidirectional conversation connection |
-| `WS /ws/session?publish=metahuman-demo` | Conversation publisher whose responses are mirrored |
-| `WS /ws/session?observe=metahuman-demo` | Receive-only observer; connect/register before a publisher |
+| `GET /healthz` | Process liveness |
+| `GET /status` | Adapter/configuration checks; not a complete inference test |
+| `WS /ws/session` | Bidirectional conversation |
+| `WS /ws/session?publish=metahuman-demo` | Question client whose response is mirrored |
+| `WS /ws/session?observe=metahuman-demo` | Receive-only Unreal observer |
 
-The application does not provide authentication or TLS. Keep the demonstration on loopback or an appropriately protected private connection. Channel names route messages; they are not access controls or conversation histories.
+## Send a question
 
-Audio uses the repository's [ACE1 binary envelope](app/protocol.py): a 32-byte header and PCM16 little-endian payload. The WAV client sends 16 kHz mono frames at 20 ms per frame. The validated English TTS configuration returns 44.1 kHz mono PCM16. JSON messages include `session.start`, `mic.end`, ASR/LLM events, `tts.start`, `tts.end`, and state changes.
-
-The Riva ASR adapter currently buffers input and invokes offline recognition. Hosted TTS returns each sentence's WAV before the adapter chunks its PCM. The Unreal MetaHuman receiver buffers the complete response before Audio2Face submission. Backend `turn_complete` is **not** a playback-finished acknowledgement.
-
-## Prerecorded input
-
-From this directory, after the Unreal observer is ready:
+After the Unreal observer is ready, submit your prepared recording:
 
 ```powershell
-$question = Join-Path $env:USERPROFILE 'Documents\VoiceQuestions\question1.wav'
-$answer = Join-Path 'outputs' ('answer-' + [guid]::NewGuid().ToString('N') + '.wav')
-.\.venv\Scripts\python.exe tools/demo_client.py `
-    --url 'ws://127.0.0.1:8080/ws/session?publish=metahuman-demo' `
-    --wav $question --require-real --output $answer
+.\.venv\Scripts\python.exe tools/demo_client.py --url 'ws://127.0.0.1:8080/ws/session?publish=metahuman-demo' --wav outputs/question1.wav --require-real --output outputs/answer1.wav
 ```
 
-This custom-input recipe uses existing arguments; a personal recording is not supplied or validated by the repository. Input must already be PCM16, 16 kHz, mono. The client writes the answer WAV and JSON report, but does not play audio. `--realtime` paces upload only. `--locale` sets metadata and does not override server languages.
+Input must be **16 kHz, mono, PCM16 WAV**. The client saves the generated answer and a JSON report; it does not play the question or answer aloud. Existing output files at the same path are replaced.
 
-Each CLI run processes one WAV with a new session and closes after backend completion. The server state machine supports returning to listening, but the current LLM adapter sends no previous messages. For repeated questions, follow the [manual playback wait](../../docs/DEMO_GUIDE.md#6-wait-for-unreal-before-the-next-question).
+Each invocation handles one question with a new session. The LLM has no earlier conversation history. Wait for Unreal's `Response completed: ACE synchronized audio and animation playback ended.` before the next question. See the [two-question walkthrough](../../docs/DEMO_GUIDE.md#5-wait-then-submit-question-2).
 
-`--generate-input` synthesizes the fixed introduction question and writes `demo-input.wav` beside the selected output. Avoid it when preserving the existing demo audio. `--mock-audio` is a synthetic protocol diagnostic, not microphone input or a real ASR quality test.
+`--realtime` paces upload only. `--locale` supplies metadata; server languages come from `.env`. `--generate-input` creates a fixed test question and can overwrite `demo-input.wav` beside the selected output.
 
-## Optional microphone client
+## Protocol and microphone support
 
-[tools/LIVE_MIC_CLIENT.md](tools/LIVE_MIC_CLIENT.md) documents `live_mic_client.py`, its dependencies, device conversion, optional Unreal channel, and test-WAV mode. It is a separate one-turn capture client. Synthetic capture and mirrored PCM tests do not establish physical Mac microphone or long-running conversation validation.
+[ACE1 framing](app/protocol.py) carries a 32-byte header and little-endian PCM16 payload. Input frames are 20 ms at 16 kHz mono. Output uses the actual TTS sample rate, 44.1 kHz in the demonstrated English configuration.
 
-## Tests and artifacts
+ASR buffers the utterance, while Unreal buffers the entire generated answer before Audio2Face submission. See [audio and conversation flow](../../docs/AUDIO_AND_CONVERSATION.md) for state and playback semantics.
 
-For the existing environment (rerun 2026-10-10: **30 passed**, dependency check clean):
+The optional [microphone client](tools/LIVE_MIC_CLIENT.md) supports one-turn capture and test-WAV input. Synthetic conversion/routing tests do not validate a complete physical microphone-to-MetaHuman session.
+
+## Tests and generated files
 
 ```powershell
+.\.venv\Scripts\python.exe -m pip install -r tools/live_mic_requirements.txt
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 .\.venv\Scripts\python.exe -m pip check
 ```
 
-A fresh test environment also needs the microphone conversion dependencies:
+Tests use unittest with mock providers and synthetic PCM. [Validation](../../docs/VALIDATION.md) distinguishes the repository's 30-test baseline from the later 39-test local GPT-OSS report.
 
-```powershell
-.\.venv\Scripts\python.exe -m pip install -r tools/live_mic_requirements.txt
-```
-
-Tests use unittest with mock adapters and synthetic PCM. They do not consume hosted inference for an end-to-end quality check. The [validation record](../../docs/VALIDATION.md) separates unit tests from saved real-provider runs and Unreal rendering checks.
-
-Ignored `runtime/logs` can contain transcripts and timing data; `runtime/audio` can contain personal voice recordings when debug audio is enabled. CLI output goes to `--output`; use an ignored `outputs` path and unique filenames. These artifacts are not needed for a public source release.
-
-[WINDOWS_SETUP_REPORT.md](WINDOWS_SETUP_REPORT.md) and [COMMAND_LOG.md](COMMAND_LOG.md) retain historical setup evidence. Existing Linux/Riva/Tokkio experiments are documented under [infra](../../infra/compose/README.md); they are not required to operate the configured hosted-service Windows path.
+`runtime/logs`, `runtime/audio`, and `outputs` are ignored. Debug artifacts may contain transcripts and personal recordings. Keep credentials in the untracked `.env`.

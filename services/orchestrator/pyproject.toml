@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ace-orchestrator"
 version = "0.1.0"
-description = "Realtime half-duplex orchestrator for the Linux RTX ACE sandbox"
+description = "Speech conversation backend for NVIDIA ACE and Unreal Engine MetaHuman"
 requires-python = ">=3.10"
 dependencies = [
   "fastapi>=0.115.0",

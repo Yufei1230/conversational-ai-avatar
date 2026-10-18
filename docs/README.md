@@ -1,31 +1,26 @@
 # Documentation
 
-## Current Windows MetaHuman demonstration
+| Guide | Use it to |
+|---|---|
+| [Demo guide](DEMO_GUIDE.md) | Start the system, submit two questions, and record the demonstration |
+| [Audio and conversation flow](AUDIO_AND_CONVERSATION.md) | Understand the introduction, dynamic responses, WebSocket routing, and playback timing |
+| [Python backend](../services/orchestrator/README.md) | Install dependencies and configure speech and language services |
+| [Unreal integration](../unreal/README.md) | Connect the bridge to an existing ACE-enabled MetaHuman |
+| [Troubleshooting](troubleshooting/README.md) | Diagnose LLM timeouts, a stationary face, missing audio, and busy responses |
+| [Validation and known limits](VALIDATION.md) | Distinguish repository tests from local runtime observations |
 
-1. [Demo guide](DEMO_GUIDE.md) ? operate the configured project, prepare voice questions, pace turns, and capture video.
-2. [Audio and conversation flow](AUDIO_AND_CONVERSATION.md) ? startup SoundWave, dynamic WAV input, buffering, routing, and session/history behavior.
-3. [Validation and limitations](VALIDATION.md) ? tested scope, saved evidence, known gaps, and future development.
-4. [Unreal integration](../unreal/README.md) ? bridge versus MetaHuman receiver, required external assets, and preservation.
-5. [Python backend](../services/orchestrator/README.md) ? configuration, setup, interfaces, and tests.
+## Technical references
 
-## Integration and diagnostic records
+- [Protocol and architecture](architecture/ace-sandbox.md)
+- [October 17 LLM timeout and recovery](troubleshooting/2026-10-17-hosted-llm-timeout-and-recovery.md)
+- [Microphone client](../services/orchestrator/tools/LIVE_MIC_CLIENT.md)
 
-- [Buffered MetaHuman TTS integration](../unreal/METAHUMAN_TTS_DEMO.md) ? dated build/runtime record.
-- [Background audio diagnosis](../unreal/METAHUMAN_AUDIO_OUTPUT.md) ? why facial animation could run while Unreal was muted.
-- [Generic WebSocket audio tests](../unreal/WEBSOCKET_AUDIO_TEST.md) ? procedural playback diagnostics, separate from the final ACE route.
-- [Microphone implementation/tests](../unreal/MICROPHONE_TEST.md) and [RDP inspection](../unreal/MICROPHONE_RDP_INSPECTION.md).
-- [Remote microphone client](../services/orchestrator/tools/LIVE_MIC_CLIENT.md).
-- [Windows setup report](../services/orchestrator/WINDOWS_SETUP_REPORT.md) ? historical configuration record.
+## Earlier integration records
 
-## Related research and legacy deployment paths
+These files retain dated commands and results from the original workstation. Local paths and generated reports are not part of a fresh checkout.
 
-These remain available as separate experiments. They are not prerequisites or claimed features of the current Windows presentation:
-
-- [ACE sandbox architecture](architecture/ace-sandbox.md).
-- [Tokkio reference stack](architecture/tokkio-reference-stack.md).
-- [Tokkio rebuild runbook](operations/tokkio-rebuild-runbook.md).
-- [Tokkio Japanese customization](operations/tokkio-japanese-customization.md).
-- [Local RAG experiments](../infra/rag/README.md).
-- [Japanese TTS experiments](../tts/README.md).
-
-Older planning and diagnostic files describe their own dates and environments. Use the current demo guide and implementation sources for present behavior.
+- [Buffered MetaHuman TTS integration](../unreal/METAHUMAN_TTS_DEMO.md)
+- [Background audio diagnosis](../unreal/METAHUMAN_AUDIO_OUTPUT.md)
+- [WebSocket audio tests](../unreal/WEBSOCKET_AUDIO_TEST.md)
+- [Microphone tests](../unreal/MICROPHONE_TEST.md) and [RDP device inspection](../unreal/MICROPHONE_RDP_INSPECTION.md)
+- [Play-in-Editor diagnostics](../unreal/PIE_DIAGNOSTICS.md)
