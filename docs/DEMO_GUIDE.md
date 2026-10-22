@@ -80,12 +80,4 @@ Keep the Unreal observer running between questions. CLI exit and backend `LISTEN
 - **Stop the backend:** press `Ctrl+C` in the Uvicorn terminal.
 - **Reconnect after a backend restart or connection failure:** stop and restart Play/Simulate, then wait for the observer-ready message again. The receiver does not automatically reconnect.
 
-## Presenting the demo
-
-Use four short chapters: **Introduction**, **System Overview**, **End-to-End Demonstration**, and **Future Work**.
-
-For each question, use the same visual sequence: **LISTENING**, **QUESTION**, **THINKING**, **RESPONDING**, then the **MetaHuman answer**. Show the actual transcript and response rather than assuming an exact model answer. `RESPONDING` is a presentation label; the runtime state is `SPEAKING`, and avatar playback follows full-response buffering.
-
-During the overview, follow the narration through the backend, audio bridge, and Unreal/ACE components. Keep Future Work to two points: **live microphone interaction** and **more natural avatar animation**. Check the recorded video for audible speech, visible lip movement, and readable captions.
-
 For failures, see [troubleshooting](troubleshooting/README.md).
