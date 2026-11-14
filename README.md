@@ -6,8 +6,6 @@ A recorded question goes through speech recognition (ASR), a language model (LLM
 
 [![System diagram showing the Python WAV publisher, conversation backend, and Unreal MetaHuman observer](docs/assets/system.png)](docs/assets/system.pdf)
 
-[Open the system diagram as a PDF](docs/assets/system.pdf).
-
 The Python client sends a WAV question over WebSocket. `ResponseMirror` forwards the synthesized speech and control events to an Unreal observer on the same channel. `MetaHumanTtsReceiver` buffers the full answer before sending it to Audio2Face-3D for playback.
 
 ## Build from scratch
