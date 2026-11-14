@@ -16,7 +16,7 @@ from app.protocol import AudioFrameKind, pack_audio_frame, unpack_audio_frame
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="ACE orchestrator demo client")
+    parser = argparse.ArgumentParser(description="Send a recorded question to the ACE conversation backend")
     parser.add_argument("--url", default="ws://127.0.0.1:8080/ws/session")
     parser.add_argument("--wav", type=Path, default=None, help="16kHz mono PCM16 WAV input")
     parser.add_argument("--mock-audio", action="store_true", help="Generate 1 second of synthetic speech frames")

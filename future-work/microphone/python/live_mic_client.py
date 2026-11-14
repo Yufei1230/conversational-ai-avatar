@@ -18,9 +18,9 @@ import numpy as np
 import soxr
 import websockets
 
-# Allow `python3 tools/live_mic_client.py` from a source checkout without
+# Allow `python3 live_mic_client.py` from a source checkout without
 # installing the orchestrator (and its server/provider dependencies) on the Mac.
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "services" / "orchestrator"))
 from app.protocol import AudioFrameKind, PCM_S16LE, pack_audio_frame, serialize_control_message, unpack_audio_frame
 
 

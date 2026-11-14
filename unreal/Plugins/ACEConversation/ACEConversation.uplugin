@@ -3,12 +3,11 @@
   "Version": 1,
   "VersionName": "0.1.0",
   "FriendlyName": "ACE Conversation",
-  "Description": "WebSocket bridge scaffolding for the Linux RTX ACE sandbox.",
+  "Description": "WebSocket transport for conversation events and PCM audio.",
   "Category": "AI",
   "CreatedBy": "OpenAI Codex",
   "CanContainContent": false,
   "IsBetaVersion": true,
-  "Plugins": [ { "Name": "AudioCapture", "Enabled": true } ],
   "Modules": [
     {
       "Name": "ACEConversation",

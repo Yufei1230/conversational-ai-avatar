@@ -12,8 +12,8 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
+from live_mic_client import Microphone, PcmConverter, Response, publisher_url, receive_response, send_capture
 from app.protocol import AudioFrameKind, pack_audio_frame, unpack_audio_frame
-from tools.live_mic_client import Microphone, PcmConverter, Response, publisher_url, receive_response, send_capture
 
 
 class ConversionTests(unittest.TestCase):
