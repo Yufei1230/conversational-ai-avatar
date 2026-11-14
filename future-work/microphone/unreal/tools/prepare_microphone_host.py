@@ -2,8 +2,8 @@
 from pathlib import Path
 import unreal
 
-repo = Path(__file__).resolve().parents[2]
-host = repo / 'unreal/outputs/MicrophoneDiagnostics'
+repo = Path(__file__).resolve().parents[4]
+host = repo / 'future-work/microphone/unreal/outputs/MicrophoneDiagnostics'
 assert Path(unreal.Paths.project_dir()).resolve() == host.resolve(), 'Use the isolated MicrophoneDiagnostics host'
 
 for map_name, microphone_mode in [('WavConversationTest', False), ('MicrophoneConversationTest', True)]:

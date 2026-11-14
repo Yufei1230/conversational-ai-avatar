@@ -5,18 +5,12 @@ public class ACEConversation : ModuleRules
     public ACEConversation(ReadOnlyTargetRules Target) : base(Target)
     {
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
-        if (Target.bBuildEditor)
-        {
-            PrivateDependencyModuleNames.Add("UnrealEd"); // Actual PIE lifecycle regression test only.
-        }
-
         PublicDependencyModuleNames.AddRange(
             new[]
             {
                 "Core",
                 "CoreUObject",
-                "Engine",
-                "AudioCaptureCore"
+                "Engine"
             }
         );
 
@@ -25,8 +19,7 @@ public class ACEConversation : ModuleRules
             {
                 "Json",
                 "Projects",
-                "WebSockets",
-                "AudioCapture", "AudioPlatformConfiguration", "Slate", "SlateCore", "InputCore"
+                "WebSockets"
             }
         );
     }

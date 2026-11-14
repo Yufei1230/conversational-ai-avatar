@@ -7,7 +7,6 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import numpy as np
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
@@ -15,7 +14,6 @@ from app.main import app
 from app.protocol import AudioFrameKind, pack_audio_frame, unpack_audio_frame
 from app.response_mirror import ResponseMirror
 from app.settings import Settings
-from tools.live_mic_client import PcmConverter
 
 
 class MirrorTests(unittest.TestCase):
@@ -32,17 +30,18 @@ class MirrorTests(unittest.TestCase):
         self.vad_patch = patch("app.vad.TurnDetector._is_speech_frame", return_value=True)
         self.vad_patch.start()
         self.addCleanup(self.vad_patch.stop)
-        self.client = self.enterContext(TestClient(app))
+        self.client = TestClient(app)
+        self.client.__enter__()
+        self.addCleanup(self.client.__exit__, None, None, None)
 
     def start(self, socket):
         socket.send_json({"type": "session.start", "payload": {"locale": "en-US"}})
         self.assertEqual(socket.receive_json()["payload"]["reason"], "ready")
 
     def turn(self, socket):
-        converter = PcmConverter(48000, 2)
-        frames = converter.feed(np.ones((4800, 2), dtype=np.float32) * 0.1) + converter.finish()
-        for frame in frames:
-            socket.send_bytes(pack_audio_frame(kind=AudioFrameKind.MIC, sample_rate_hz=16000, channels=1, payload=frame))
+        pcm_frame = (3277).to_bytes(2, "little", signed=True) * 320
+        for _ in range(5):
+            socket.send_bytes(pack_audio_frame(kind=AudioFrameKind.MIC, sample_rate_hz=16000, channels=1, payload=pcm_frame))
         socket.send_json({"type": "mic.end", "payload": {}})
         messages = []
         while True:

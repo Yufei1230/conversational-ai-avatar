@@ -12,4 +12,4 @@ python3 infra/llm/check_llm_endpoint.py \
 
 Run with `--help` for timeout, prompt, and generation options. The default
 prompt and assistant instructions are English. This helper checks the LLM
-endpoint; use the orchestrator's audio demo to verify a full conversation turn.
+endpoint; use the [recorded conversation run guide](../../docs/RUN.md) to verify a full conversation turn.
